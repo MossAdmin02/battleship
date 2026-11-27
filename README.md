@@ -75,6 +75,18 @@ npm start
 | `public/app.js`, `public/styles.css` | หน้าจอผู้เล่น |
 | `test/` | ชุดทดสอบ (`npm test`) |
 
+## Deploy บน Render
+
+ค่าตั้งอยู่ใน `render.yaml` (แพ็กเกจฟรี ภูมิภาคสิงคโปร์) และ `.node-version`
+
+1. เปิด https://render.com/deploy?repo=https://github.com/MossAdmin02/battleship แล้วล็อกอินด้วย GitHub
+2. ตรวจรายการ service ชื่อ `battleship` แล้วกดยืนยันการสร้าง
+3. รอจนสถานะเป็น Live แล้วเปิดลิงก์ `.onrender.com` ที่ Render แสดง
+
+หลังจากนั้นทุกครั้งที่ push ขึ้น branch `main` Render จะ deploy ใหม่เอง
+
+ข้อจำกัดของแพ็กเกจฟรี ([เอกสาร](https://render.com/docs/free)): ถ้าไม่มีคนใช้ 15 นาที เซิร์ฟเวอร์จะหลับ เปิดครั้งถัดไปรอราว 1 นาที และ Render อาจรีสตาร์ตเมื่อไรก็ได้ ทุกครั้งที่หลับ รีสตาร์ต หรือ deploy ใหม่ ห้องที่เปิดอยู่จะหายไป
+
 ## ข้อควรรู้เมื่อนำขึ้นอินเทอร์เน็ต
 
 - ข้อมูลห้องอยู่ในหน่วยความจำ รีสตาร์ตเซิร์ฟเวอร์แล้วห้องหาย และรันได้ instance เดียว
