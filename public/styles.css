@@ -292,12 +292,7 @@ button.cell:active:not(:disabled) { transform: none; }
 
 .game { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .status { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
-.status.reveal { min-height: 82px; position: sticky; top: 6px; z-index: 6; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5); }
-.status.reveal.hit { background-color: #0d3b27; border-color: #4be07a; }
-.status.reveal.miss { background-color: #3b1420; border-color: #ff6b72; }
-.status.reveal.hit, .status.reveal.miss { background-image: none; }
 .status.over { border-color: var(--yellow); box-shadow: 0 0 18px rgba(255, 201, 51, 0.35); }
-.headline { font-size: 1.05rem; font-weight: 500; }
 .timer { font-weight: 700; font-size: 1.2rem; white-space: nowrap; color: var(--cyan); }
 .timer.low { color: #ff7575; }
 
@@ -335,7 +330,7 @@ button.cell:active:not(:disabled) { transform: none; }
 .prompt { padding: 22px 12px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; }
 
 /* กระดานที่กำลังดู */
-.stage { scroll-margin: 110px 0 140px; padding: 12px; }
+.stage { scroll-margin: 8px 0; padding: 12px; }
 .stage .board { width: min(100%, 360px); margin: 0 auto; }
 .stage-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .stage-head h2 { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

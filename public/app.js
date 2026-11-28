@@ -476,7 +476,9 @@
         target && side('เป้าหมาย', targetId, 'victim'),
       ),
       h('div', { class: 'chips' },
-        fired.map((s) => chip(s, s.result, s.result === 'hit' ? '💥 โดน' : '✖ พลาด')),
+        fired.map((s) => chip(s, s.result, s.result === 'hit'
+          ? `💥 โดน${s.sunk ? ' · เรือจม' : ''}${s.eliminated ? ' · ตกรอบ' : ''}`
+          : '✖ พลาด')),
         pending.map((s) => chip(s, 'wait', '…')),
       ),
       target && playerBoard(target),
@@ -843,6 +845,7 @@
   }
 
   function statusBar() {
+    if (state.phase === 'reveal') return null; // ช่วงเปิดคำสั่ง แถบลำดับผู้ยิงกับกระดานบอกครบแล้ว
     const mine = me();
     if (state.phase === 'command') {
       const waiting = state.players.filter((p) => p.alive && !p.submitted);
@@ -859,13 +862,6 @@
           h('p', null, hint),
         ),
         timer());
-    }
-    if (state.phase === 'reveal') {
-      const event = state.lastEvent;
-      const names = Object.fromEntries(state.players.map((p) => [p.id, p.name]));
-      return h('div', { class: `status reveal ${event.type === 'shot' ? event.result : ''}` },
-        h('div', null, h('strong', null, `รอบที่ ${state.round} · เปิดคำสั่ง`), h('p', { class: 'headline' }, describe(event, names))),
-      );
     }
     // จบเกม
     const winners = state.winnerIds.map((id) => player(id)?.name).filter(Boolean);
