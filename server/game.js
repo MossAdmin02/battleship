@@ -170,7 +170,7 @@ class Game {
   updateSettings(id, settings = {}) {
     this.requireHost(id);
     if (this.phase !== 'lobby') fail('เปลี่ยนการตั้งค่าได้เฉพาะในห้องรอ');
-    const { startBullets, commandSeconds } = settings || {};
+    const { startBullets, commandSeconds, autoBullet } = settings || {};
     if (startBullets !== undefined) {
       if (!Number.isInteger(startBullets) || startBullets < CONFIG.minStartBullets || startBullets > CONFIG.maxStartBullets) {
         fail('จำนวนกระสุนไม่ถูกต้อง');
@@ -180,6 +180,10 @@ class Game {
     if (commandSeconds !== undefined) {
       if (!CONFIG.commandSeconds.includes(commandSeconds)) fail('เวลาไม่ถูกต้อง');
       this.settings.commandSeconds = commandSeconds;
+    }
+    if (autoBullet !== undefined) {
+      if (typeof autoBullet !== 'boolean') fail('การตั้งค่าเพิ่มกระสุนไม่ถูกต้อง');
+      this.settings.autoBullet = autoBullet;
     }
   }
 
@@ -246,6 +250,8 @@ class Game {
 
   startCommand() {
     const alive = this.players.filter((p) => p.alive);
+    const refill = this.settings.autoBullet && this.round > 0; // รอบแรกใช้กระสุนเริ่มต้น
+    if (refill) for (const p of alive) p.bullets += 1;
     if (alive.every((p) => p.bullets === 0)) return this.endByShipCells('ammo');
     this.round += 1;
     this.phase = 'command';
@@ -257,7 +263,7 @@ class Game {
       p.command = [];
       p.submitted = !p.alive || p.bullets === 0;
     }
-    this.emit({ type: 'round', round: this.round });
+    this.emit({ type: 'round', round: this.round, refill });
   }
 
   checkShots(player, shots) {

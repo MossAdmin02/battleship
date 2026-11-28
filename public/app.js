@@ -40,6 +40,7 @@
     if (bullets >= minStartBullets && bullets <= maxStartBullets) out.startBullets = bullets;
     const seconds = Number(read('localStorage', 'commandSeconds'));
     if (commandSeconds.includes(seconds)) out.commandSeconds = seconds;
+    if (read('localStorage', 'autoBullet') === 'on') out.autoBullet = true;
     return out;
   }
 
@@ -196,6 +197,7 @@
         // เริ่มรอบใหม่: หุบกระดานเป้าไว้ก่อน เว้นแต่เหลือคู่ต่อสู้คนเดียว
         const enemies = next.players.filter((p) => p.id !== next.you && p.alive);
         targetView = enemies.length === 1 ? enemies[0].id : null;
+        if (targetView !== null) scrollAfterRender = '.stage';
       }
       if (newRound || mine.submitted) {
         selected = next.myShots.slice();
@@ -274,11 +276,11 @@
 
   /** ป้ายสถานะสั้นๆ ของผู้เล่น */
   function badgeFor(p) {
+    if (state.phase === 'over') return state.winnerIds.includes(p.id) ? '🏆 ชนะ' : '💀 แพ้';
     if (p.left) return 'ออกแล้ว';
     if (!p.alive) return 'ตกรอบ';
     if (!p.connected) return 'หลุด';
     if (state.phase === 'command') return p.submitted ? '✓ ส่งแล้ว' : 'กำลังเขียน…';
-    if (state.phase === 'over' && state.winnerIds.includes(p.id)) return '🏆 ชนะ';
     return null;
   }
 
@@ -304,6 +306,8 @@
     };
 
     const badge = badgeFor(p);
+    let outcome = '';
+    if (state.phase === 'over') outcome = state.winnerIds.includes(p.id) ? ' win' : ' lose';
     const classes = ['board', own && 'own', !p.alive && 'dead', targeting && 'targetable', shooting && 'shooting', event && `struck-${event.result}`];
     return h('section', { class: classes.filter(Boolean).join(' '), 'data-player': p.id },
       boardGrid({
@@ -316,7 +320,7 @@
       }),
       h('div', { class: 'info' },
         h('span', { class: 'bullets', title: 'กระสุน' }, `● ${p.bullets}`),
-        badge && h('span', { class: 'badge' }, badge),
+        badge && h('span', { class: `badge${outcome}` }, badge),
         h('span', { class: 'nametag' }, own ? `${p.name} (คุณ)` : displayName(p)),
       ),
     );
@@ -405,10 +409,18 @@
     return h('section', { class: 'panel stage' },
       h('div', { class: 'stage-head' },
         h('h2', null, `🎯 ${displayName(p)}`),
-        h('button', { type: 'button', class: 'close', 'data-focus': 'close', onclick: () => { targetView = null; render(); } }, 'หุบกระดาน ✕'),
+        timer(),
+        h('button', { type: 'button', class: 'close', 'data-focus': 'close', onclick: closeTarget }, 'หุบกระดาน ✕'),
       ),
       playerBoard(p),
     );
+  }
+
+  /** หุบแล้วพากลับไปที่รายชื่อ จะได้เลือกคนใหม่ได้ทันที */
+  function closeTarget() {
+    targetView = null;
+    scrollAfterRender = '.picker';
+    render();
   }
 
   /** รายการช่องที่เลือกไว้ทุกกระดาน (เพราะเปิดดูได้ทีละคน) กดเพื่อยกเลิกได้ก่อนส่ง */
@@ -552,6 +564,14 @@
     );
   }
 
+  /** สวิตช์เพิ่มกระสุนอัตโนมัติ ใช้ทั้งหน้าตั้งค่าและห้องรอ */
+  function autoBulletSwitch(checked, attrs) {
+    return h('label', { class: 'setting switch' },
+      h('span', null, 'เพิ่มกระสุน 1 นัดทุกรอบ', h('small', null, 'ตั้งแต่รอบที่ 2 ทุกคนที่ยังรอดได้เพิ่มอัตโนมัติ')),
+      h('input', { type: 'checkbox', checked, ...attrs }),
+    );
+  }
+
   function settingsPanel() {
     const current = { ...Rules.DEFAULT_SETTINGS, ...savedSettings() };
     const name = nameField(h('p'));
@@ -564,6 +584,9 @@
       name.element,
       select('startBullets', 'กระสุนเริ่มต้นของห้องที่ฉันสร้าง', bulletChoices(), (v) => `${v} นัด`),
       select('commandSeconds', 'เวลาเขียนคำสั่งยิง', Rules.LIMITS.commandSeconds, (v) => `${v} วินาที`),
+      autoBulletSwitch(current.autoBullet, {
+        onchange: (e) => write('localStorage', 'autoBullet', e.target.checked ? 'on' : null),
+      }),
       h('label', { class: 'setting switch' }, 'เอฟเฟกต์เคลื่อนไหว', h('input', {
         type: 'checkbox',
         checked: read('localStorage', 'effects') !== 'off',
@@ -620,6 +643,7 @@
         h('li', null, 'ยิงช่องที่เพิ่งถูกคนอื่นยิงไปก่อนในรอบเดียวกัน นับว่าพลาด'),
         h('li', null, 'เรือจมครบทุกลำ = ตกรอบ คนสุดท้ายที่รอดเป็นผู้ชนะ'),
         h('li', null, 'ถ้ากระสุนหมดทุกคน หรือไม่มีใครยิง 3 รอบติด คนที่เหลือช่องเรือมากที่สุดชนะ'),
+        h('li', null, 'ถ้าห้องเปิด "เพิ่มกระสุน 1 นัดทุกรอบ" ตั้งแต่รอบที่ 2 ทุกคนที่ยังรอดได้กระสุนเพิ่มคนละ 1 นัด'),
         h('li', null, 'หัวห้องเพิ่มบอทได้ บอทเห็นข้อมูลเท่าผู้เล่นคนหนึ่ง ไม่รู้ตำแหน่งเรือที่ซ่อนอยู่'),
       ),
     );
@@ -672,9 +696,14 @@
         onclick: () => send('addBot', { level }),
       }, `+ บอท${label}`))),
       select('startBullets', 'กระสุนเริ่มต้นต่อคน', bulletChoices(), (v) => `${v} นัด`),
-      settings.startBullets < Rules.DEFAULT_SETTINGS.startBullets
+      !settings.autoBullet && settings.startBullets < Rules.DEFAULT_SETTINGS.startBullets
         && h('p', { class: 'note' }, 'กระสุนน้อย เกมมักจบเพราะกระสุนหมดก่อนเหลือผู้รอดคนเดียว'),
       select('commandSeconds', 'เวลาเขียนคำสั่งยิง', limits.commandSeconds, (v) => `${v} วินาที`),
+      autoBulletSwitch(settings.autoBullet, {
+        disabled: !host,
+        'data-focus': 'auto-bullet',
+        onchange: (e) => send('settings', { autoBullet: e.target.checked }),
+      }),
       host
         ? h('button', { type: 'button', class: 'primary', disabled: !enough, onclick: () => send('start') }, enough ? 'เริ่มเกม' : `รอผู้เล่นอย่างน้อย ${limits.minPlayers} คน`)
         : h('p', { class: 'muted' }, 'รอหัวห้องกดเริ่มเกม…'),
@@ -779,19 +808,19 @@
     return el;
   }
 
-  function tick(el = document.querySelector('.timer')) {
-    if (!el || deadline === null) return;
+  function tick(el) {
+    if (deadline === null) return;
     const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
     el.textContent = `⏱ ${seconds} วินาที`;
     el.classList.toggle('low', seconds <= 10);
   }
-  setInterval(() => tick(), 250);
+  setInterval(() => document.querySelectorAll('.timer').forEach(tick), 250);
 
   /** แปลงเหตุการณ์เป็นข้อความ */
   function describe(event, names) {
     const name = (id) => (id === state.you ? 'คุณ' : names[id] ?? player(id)?.name ?? '?');
     switch (event.type) {
-      case 'round': return `— รอบที่ ${event.round} —`;
+      case 'round': return `— รอบที่ ${event.round} —${event.refill ? ' ทุกคนได้กระสุน +1' : ''}`;
       case 'reveal': return 'ทุกคนส่งคำสั่งแล้ว เริ่มเปิดคำสั่ง';
       case 'idle': return `รอบนี้ไม่มีใครยิง (ติดต่อกัน ${event.count}/${state.limits.idleRoundsToEnd})`;
       case 'open': return `เปิดคำสั่งของ ${name(event.shooterId)} — ยิง ${event.count} นัด`;
@@ -822,7 +851,14 @@
       if (!mine.alive) hint = 'คุณตกรอบแล้ว รอดูต่อได้เลย';
       else if (mine.submitted) hint = `รอ ${waiting.map((p) => p.name).join(', ')}`;
       else if (mine.bullets === 0) hint = 'คุณไม่มีกระสุนในรอบนี้';
-      return h('div', { class: 'status' }, h('div', null, h('strong', null, title), h('p', null, hint)), timer());
+      const refilled = state.settings.autoBullet && state.round > 1 && mine.alive;
+      return h('div', { class: 'status' },
+        h('div', null,
+          h('strong', null, title),
+          refilled && h('em', { class: 'refill' }, '● +1 กระสุน'),
+          h('p', null, hint),
+        ),
+        timer());
     }
     if (state.phase === 'reveal') {
       const event = state.lastEvent;
@@ -833,20 +869,80 @@
     }
     // จบเกม
     const winners = state.winnerIds.map((id) => player(id)?.name).filter(Boolean);
-    const reason = {
-      last: 'รอดเป็นคนสุดท้าย',
-      ammo: 'กระสุนหมดทุกคน ตัดสินจากช่องเรือที่เหลือ',
-      idle: 'ไม่มีใครยิงหลายรอบติด ตัดสินจากช่องเรือที่เหลือ',
-    }[state.winReason];
     return h('div', { class: 'status over' },
       h('div', null,
         h('strong', null, winners.length > 1 ? `🏆 เสมอกัน: ${winners.join(', ')}` : `🏆 ${winners[0] || '-'} ชนะ!`),
-        h('p', null, reason),
+        h('p', null, WIN_REASONS[state.winReason]),
       ),
-      isHost()
-        ? h('button', { type: 'button', class: 'primary', onclick: () => send('rematch') }, 'เล่นอีกรอบ')
-        : h('p', { class: 'muted' }, 'รอหัวห้องกดเล่นอีกรอบ'),
+      rematchControl(),
     );
+  }
+
+  // ---------- ผลจบเกม ----------
+
+  const WIN_REASONS = {
+    last: 'รอดเป็นคนสุดท้าย',
+    ammo: 'กระสุนหมดทุกคน ตัดสินจากช่องเรือที่เหลือ',
+    idle: 'ไม่มีใครยิงหลายรอบติด ตัดสินจากช่องเรือที่เหลือ',
+  };
+
+  function rematchControl() {
+    return isHost()
+      ? h('button', { type: 'button', class: 'primary', onclick: () => send('rematch') }, 'เล่นอีกรอบ')
+      : h('p', { class: 'muted' }, 'รอหัวห้องกดเล่นอีกรอบ');
+  }
+
+  const TROPHY = '<svg class="trophy" viewBox="0 0 120 120" aria-hidden="true">'
+    + '<defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="0.45" stop-color="#ffc933"/><stop offset="1" stop-color="#b8720a"/></linearGradient></defs>'
+    + '<path d="M32 24H15c0 21 9 32 27 35M88 24h17c0 21-9 32-27 35" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>'
+    + '<g fill="url(#gold)" stroke="#6b4204" stroke-width="2.5" stroke-linejoin="round">'
+    + '<path d="M52 74h16v18H52z"/><path d="M40 90h40v11H40z"/><path d="M30 101h60v13H30z"/><path d="M29 12h62v30c0 21-13 36-31 36S29 63 29 42z"/></g>'
+    + '<path fill="#fffbe6" d="M60 24l4.7 10.5 11.4 1.2-8.5 7.7 2.4 11.2L60 48.9l-10 5.7 2.4-11.2-8.5-7.7 11.4-1.2z"/></svg>';
+
+  const resultDialog = document.getElementById('result');
+  let resultClosed = false; // ปิดหน้าต่างผลของเกมนี้ไปแล้ว
+  let resultKey = ''; // วาดเนื้อหาใหม่เฉพาะเมื่อข้อมูลที่แสดงเปลี่ยน
+  // ปิดเพราะเริ่มเกมใหม่หรือออกจากห้อง ไม่นับว่าผู้เล่นปิดเอง
+  resultDialog.addEventListener('close', () => { if (state?.phase === 'over') resultClosed = true; });
+
+  function resultContent(won) {
+    const winners = state.players.filter((p) => state.winnerIds.includes(p.id));
+    const losers = state.players.filter((p) => !state.winnerIds.includes(p.id));
+    const draw = winners.length > 1;
+    let verdict = '💀 คุณแพ้';
+    if (won) verdict = draw ? '🤝 คุณเสมอ' : '🎉 คุณชนะ!';
+    return [
+      svg(TROPHY),
+      h('p', { class: 'result-label' }, draw ? 'เสมอกัน' : 'ผู้ชนะ'),
+      h('h2', { id: 'result-title' }, winners.map(displayName).join(', ') || '-'),
+      h('p', { class: 'muted' }, WIN_REASONS[state.winReason]),
+      h('p', { class: `verdict ${won ? 'win' : 'lose'}` }, verdict),
+      losers.length > 0 && h('ul', { class: 'losers', 'aria-label': 'ผู้แพ้' },
+        losers.map((p) => h('li', null, `💀 ${p.id === state.you ? 'คุณ' : displayName(p)} แพ้`))),
+      h('div', { class: 'result-actions' },
+        rematchControl(),
+        h('button', { type: 'button', onclick: () => resultDialog.close() }, 'ดูกระดาน'),
+      ),
+    ].filter(Boolean);
+  }
+
+  /** เปิดหน้าต่างผลเมื่อเกมจบ และปิดเมื่อออกจากช่วงจบเกม */
+  function syncResult() {
+    if (state?.phase !== 'over') {
+      resultClosed = false;
+      resultKey = '';
+      if (resultDialog.open) resultDialog.close();
+      return;
+    }
+    if (resultClosed) return;
+    const key = JSON.stringify([state.code, state.you, state.hostId, state.winnerIds, state.players.map((p) => p.name)]);
+    if (key !== resultKey) {
+      resultKey = key;
+      const won = state.winnerIds.includes(state.you);
+      resultDialog.classList.toggle('lose', !won);
+      resultDialog.replaceChildren(...resultContent(won));
+    }
+    if (!resultDialog.open) resultDialog.showModal();
   }
 
   function actionBar() {
@@ -884,7 +980,7 @@
 
     let body;
     if (state.phase === 'command') {
-      body = [targetPicker(ordered), targetStage(), ownBoard(), actionBar()];
+      body = [targetPicker(ordered), targetStage(), actionBar(), ownBoard()];
     } else if (state.phase === 'reveal') {
       body = [turnStrip(), revealStage(), ownBoard(), fold('all', 'กระดานทั้งหมด', allBoards)];
     } else {
@@ -949,9 +1045,12 @@
     for (const [selector, left, top] of scrollers) root.querySelector(selector)?.scrollTo(left, top);
     if (focusKey) root.querySelector(`[data-focus="${focusKey}"]`)?.focus({ preventScroll: true });
     if (scrollAfterRender) {
-      root.querySelector(scrollAfterRender)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // ตอนเล็ง ดันกระดานขึ้นชิดขอบบน ให้แถบคำสั่งใต้กระดานอยู่ในจอด้วย
+      const block = state?.phase === 'command' && scrollAfterRender === '.stage' ? 'start' : 'nearest';
+      root.querySelector(scrollAfterRender)?.scrollIntoView({ block, behavior: 'smooth' });
       scrollAfterRender = null;
     }
+    syncResult();
   }
 
   applyEffects();

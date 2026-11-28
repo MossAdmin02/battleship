@@ -16,7 +16,8 @@
     idleRoundsToEnd: 3, // ไม่มีใครยิงติดต่อกันกี่รอบแล้วจบเกม
   };
   // กระสุนต่ำกว่านี้มาก เกมจะจบเพราะกระสุนหมดก่อนมีใครจมครบ (ยิงโดน 7 ครั้งจึงจมหมดหนึ่งคน)
-  const DEFAULT_SETTINGS = { startBullets: 8, commandSeconds: 60 };
+  // autoBullet: ตั้งแต่รอบที่ 2 ทุกคนที่ยังรอดได้กระสุนเพิ่ม 1 นัดทุกรอบ
+  const DEFAULT_SETTINGS = { startBullets: 8, commandSeconds: 60, autoBullet: false };
 
   /** ช่องที่เรือครอบครอง (index 0..24) หรือ null ถ้าข้อมูลผิดหรือล้นกระดาน */
   function cellsOf(ship) {

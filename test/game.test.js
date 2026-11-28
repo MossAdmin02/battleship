@@ -266,6 +266,82 @@ test('หัวห้อง ชื่อซ้ำ จำนวนคน แล�
   assert.equal(game.hostId, null);
 });
 
+test('เพิ่มกระสุนทุกรอบ: ปิดเป็นค่าเริ่มต้น และรับเฉพาะ true/false', () => {
+  const game = new Game('ROOM');
+  const a = game.addPlayer('a');
+  assert.equal(game.settings.autoBullet, false);
+  assert.throws(() => game.updateSettings(a.id, { autoBullet: 'yes' }), /เพิ่มกระสุน/);
+  game.updateSettings(a.id, { autoBullet: true });
+  assert.equal(game.view(a.id).settings.autoBullet, true);
+  game.updateSettings(a.id, { autoBullet: false });
+  assert.equal(game.settings.autoBullet, false);
+});
+
+test('เพิ่มกระสุนทุกรอบ: ได้ตั้งแต่รอบที่ 2 และเกมไม่จบเพราะกระสุนหมด', () => {
+  const { game, players: [a, b] } = setup(2, { startBullets: 1, autoBullet: true });
+  assert.deepEqual([a.bullets, b.bullets], [1, 1], 'รอบแรกใช้กระสุนเริ่มต้น');
+  assert.equal(game.lastEvent.refill, false);
+  game.submit(a.id, at(b, 0));
+  game.submit(b.id, at(a, 1)); // โดนทั้งคู่ กระสุนหายหมด
+  reveal(game);
+  assert.equal(game.phase, 'command');
+  assert.equal(game.round, 2);
+  assert.deepEqual([a.bullets, b.bullets], [1, 1]);
+  assert.equal(game.lastEvent.refill, true);
+
+  // กระสุนที่ไม่ได้ใช้สะสมต่อ
+  game.submit(a.id, []);
+  game.submit(b.id, []);
+  reveal(game);
+  assert.deepEqual([a.bullets, b.bullets], [2, 2]);
+
+  // กติกาไม่มีใครยิง 3 รอบติดยังใช้ และรอบที่จบเกมไม่เพิ่มกระสุน
+  for (let round = 0; round < 2; round++) {
+    game.submit(a.id, []);
+    game.submit(b.id, []);
+    reveal(game);
+  }
+  assert.equal(game.winReason, 'idle');
+  assert.deepEqual([a.bullets, b.bullets], [3, 3]);
+});
+
+test('เพิ่มกระสุนทุกรอบ: คนตกรอบไม่ได้กระสุน', () => {
+  const { game, players: [a, b, c] } = setup(3, { startBullets: 10, autoBullet: true });
+  game.submit(a.id, at(c, ...SHIP_CELLS));
+  game.submit(b.id, []);
+  game.submit(c.id, []);
+  reveal(game);
+  assert.equal(c.alive, false);
+  assert.equal(c.bullets, 0);
+  assert.equal(b.bullets, 11);
+});
+
+test('จำลองเกมสุ่มแบบเพิ่มกระสุนทุกรอบ ต้องจบเสมอ', () => {
+  for (let n = 0; n < 300; n++) {
+    const count = 2 + (n % 7);
+    const game = new Game('SIM');
+    const players = Array.from({ length: count }, (_, i) => game.addPlayer(`s${i}`));
+    game.updateSettings(players[0].id, { startBullets: 1, autoBullet: true });
+    game.start(players[0].id);
+    game.autoPlace();
+    let rounds = 0;
+    while (game.phase !== 'over') {
+      assert.ok(++rounds < 500, 'เกมไม่จบ');
+      for (const p of game.players.filter((x) => x.alive && !x.submitted)) {
+        if (game.phase !== 'command') break;
+        const options = game.players
+          .filter((v) => v.alive && v !== p)
+          .flatMap((v) => Array.from({ length: 25 }, (_, cell) => ({ target: v.id, cell })).filter((s) => !v.shots[s.cell]))
+          .sort(() => Math.random() - 0.5);
+        game.submit(p.id, options.slice(0, Math.floor(Math.random() * (p.bullets + 1))));
+      }
+      reveal(game);
+    }
+    assert.notEqual(game.winReason, 'ammo');
+    assert.ok(game.winnerIds.length >= 1);
+  }
+});
+
 test('จำลองเกมสุ่มจำนวนมาก ต้องจบเสมอและกระสุนไม่เพิ่ม', () => {
   for (let n = 0; n < 300; n++) {
     const count = 2 + (n % 7);
